@@ -1,0 +1,67 @@
+
+#This configuration has been tested on GitLab 6.0.0 and GitLab 6.0.1
+#Note this config assumes unicorn is listening on default port 8900.
+#Module dependencies
+# mod_rewrite
+# mod_ssl
+# mod_proxy
+# mod_proxy_http
+# mod_headers
+
+# This section is only needed if you want to redirect http traffic to https.
+# You can live without it but clients will have to type in https:// to reach gitlab.
+<VirtualHost *:80>
+  ServerName {{ gitlab_hostname }}
+  ServerSignature Off
+
+  RewriteEngine on
+  RewriteCond %{HTTPS} !=on
+  RewriteRule .* https://%{SERVER_NAME}%{REQUEST_URI} [NE,R,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    SSLEngine on
+    SSLProtocol ALL -SSLv2
+    SSLHonorCipherOrder On
+    SSLCipherSuite ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AES:RSA+3DES:!ADH:!AECDH:!MD5:!DSS
+
+    SSLCertificateFile      /etc/ssl/certs/wildcard_public_cert.crt
+    SSLCertificateKeyFile   /etc/ssl/private/wildcard_private.key
+    SSLCACertificateFile    /etc/ssl/certs/wildcard_ca.pem
+
+  ServerName {{ gitlab_hostname }}
+  ServerSignature Off
+
+  ProxyPreserveHost On
+
+  <Location />
+    # New authorization commands for apache 2.4 and up
+    # http://httpd.apache.org/docs/2.4/upgrading.html#access
+    Require all granted
+
+    ProxyPassReverse http://127.0.0.1:8900
+    ProxyPassReverse http://{{ gitlab_hostname }}/
+  </Location>
+
+  #apache equivalent of nginx try files
+  # http://serverfault.com/questions/290784/what-is-apaches-equivalent-of-nginxs-try-files
+  # http://stackoverflow.com/questions/10954516/apache2-proxypass-for-rails-app-gitlab
+  RewriteEngine on
+  RewriteCond %{DOCUMENT_ROOT}/%{REQUEST_FILENAME} !-f
+  RewriteRule .* http://127.0.0.1:8900%{REQUEST_URI} [P,QSA]
+  RequestHeader set X_FORWARDED_PROTO 'https'
+
+  # needed for downloading attachments
+  DocumentRoot /var/www/gitlab/gitlab/public
+
+  #Set up apache error documents, if back end goes down (i.e. 503 error) then a maintenance/deploy page is thrown up.
+  ErrorDocument 404 /404.html
+  ErrorDocument 422 /422.html
+  ErrorDocument 500 /500.html
+  ErrorDocument 503 /deploy.html
+
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b" common_forwarded
+  ErrorLog                /var/log/apache2/gitlab.info-error_log
+  CustomLog               /var/log/apache2/gitlab.info-access_log common
+
+</VirtualHost>

@@ -97,3 +97,17 @@ selfoss_domain: "news.{{ domain }}"
 selfoss_db_username: selfoss
 # selfoss_db_password: (required)
 selfoss_db_database: selfoss
+
+# gitlab
+gitlab_branch: 6-6-stable
+gitlab_shell_version: v1.8.0
+
+gitlab_db_type: postgres
+gitlab_db_name: gitlab
+gitlab_db_user: gitlab
+# gitlab_db_passwd: "(required)"
+# gitlab_hostname: "(required)"
+
+gitlab_user: git
+gitlab_uwsgi_port: 4001
+gitlab_ssh_port: 22

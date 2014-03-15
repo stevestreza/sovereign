@@ -1,0 +1,112 @@
+---
+## TODO: parametrize
+
+- name: ensure there's a user for Gitlab
+  user: name={{ gitlab_user }} comment="GitLab" createhome=true home=/var/www/gitlab
+
+- name: Clone GitLab source code from git.
+  git: repo=https://github.com/gitlabhq/gitlabhq.git dest=/var/www/gitlab/gitlab version={{ gitlab_branch }}
+  changed_when: False
+
+- name: ensure GitLab is owned by correct user
+  file: path=/var/www/gitlab/gitlab owner={{ gitlab_user }} recurse=yes
+
+## setup file system hierarchy and permissions
+- name: ensure GitLab can write to the 'log' directory
+  file: path=/var/www/gitlab/log state=directory recurse=yes mode=0700 owner={{ gitlab_user }}
+
+- name: ensure GitLab can write to 'tmp'
+  file: path=/var/www/gitlab/tmp state=directory recurse=yes mode=0700 owner={{ gitlab_user }}
+
+- name: ensure GitLab can write to 'tmp/pids'
+  file: path=/var/www/gitlab/tmp/pids state=directory recurse=yes mode=0700 owner={{ gitlab_user }}
+
+- name: ensure GitLab can write to 'public/uploads'
+  file: path=/var/www/gitlab/gitlab/public/uploads state=directory recurse=yes mode=0700 owner={{ gitlab_user }}
+
+# would be nice if next 2 can be merged
+- name: remove GitLab 'log' directory
+  file: state=absent path=/var/www/gitlab/gitlab/log
+
+- name: symlink GitLab 'log' directory
+  file: state=link src=/var/www/gitlab/log dest=/var/www/gitlab/gitlab/log force=yes
+
+# would be nice if next 2 can be merged
+- name: remove GitLab 'tmp' directory
+  file: state=absent path=/var/www/gitlab/gitlab/tmp
+
+- name: symlink GitLab 'tmp' directory
+  file: state=link src=/var/www/gitlab/tmp dest=/var/www/gitlab/gitlab/tmp force=yes
+
+- name: ensure directory for satellites exists
+  file: state=directory path=/var/www/gitlab/gitlab-satellites owner={{ gitlab_user }} group={{ gitlab_user }} mode=0700
+
+- name: ensure directory for repositories exists
+  file: state=directory path=/decrypted/repositories owner={{ gitlab_user }} group={{ gitlab_user }} mode=2770
+
+## config files
+- name: .gitconfig for git user
+  template: src=gitconfig dest=/var/www/gitlab/.gitconfig owner={{ gitlab_user }} group={{ gitlab_user }} mode=0644
+  notify: restart gitlab
+
+- name: ensure GitLab config file exists
+  template: src=gitlab.yml dest=/var/www/gitlab/gitlab/config/gitlab.yml mode=0640 owner=root group={{ gitlab_user }}
+  notify: restart gitlab
+
+- name: ensure uwsgi config file exists
+  template: src=uwsgi.ini dest=/etc/uwsgi/vassals/gitlab.ini mode=0644 owner=root group=root
+
+- name: ensure database config is written
+  template: src=database.yml dest=/var/www/gitlab/gitlab/config/database.yml mode=0640 owner=root group={{ gitlab_user }}
+
+- name: python2 symlink
+  file: state=link src=/usr/bin/python2.7 dest=/usr/bin/python2
+
+- name: ensure GitLab bundle is installed
+  command: chdir=/var/www/gitlab/gitlab bundle install --deployment --without development test postgres aws
+  changed_when: False
+
+- name: install gitlab unicorn.rb
+  template: src=unicorn.rb.j2 dest=/var/www/gitlab/gitlab/config/unicorn.rb mode=0644 owner={{ gitlab_user }}
+  notify: restart gitlab
+
+- name: install gitlab resque.yml
+  template: src=resque.yml.j2 dest=/var/www/gitlab/gitlab/config/resque.yml mode=0644 owner={{ gitlab_user }}
+  notify: restart gitlab
+
+- name: run 'rake gitlab:setup' task
+  sudo_user: "{{ gitlab_user }}"
+  shell: >
+      creates=/var/www/gitlab/gitlab:setup
+      chdir=/var/www/gitlab/gitlab
+      yes 'yes'
+      |  bundle exec rake gitlab:setup RAILS_ENV=production
+      && touch /var/www/gitlab/gitlab:setup
+
+- name: run 'rake assets:precompile' task
+  sudo_user: "{{ gitlab_user }}"
+  shell: >
+      creates=/var/www/gitlab/gitlab/public/assets
+      chdir=/var/www/gitlab/gitlab
+      yes 'yes'
+      |  bundle exec rake assets:precompile RAILS_ENV=production
+
+#- name: Gitlab upgrade
+#  shell: >
+#    chdir=/var/www/gitlab/gitlab
+#    bundle exec rake db:migrate RAILS_ENV=production
+#    bundle exec rake cache:clear RAILS_ENV=production
+#    bundle exec rake assets:clean  RAILS_ENV=production
+#    bundle exec rake assets:precompile  RAILS_ENV=production
+#
+
+- name: install gitlab debian defaults
+  template: src=etc_default_gitlab.j2 dest=/etc/default/gitlab mode=0644 owner=root group=root
+  notify: restart gitlab
+
+- name: install gitlab init.d script
+  template: src=etc_init_d_gitlab.j2 dest=/etc/init.d/gitlab mode=0755 owner=root group=root
+  notify: restart gitlab
+
+- name: ensure gitlab is running
+  service: name=gitlab state=started enabled=yes

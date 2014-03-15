@@ -1,0 +1,10 @@
+---
+- include: packages.yml tags=gitlab
+- include: databases.yml tags=gitlab
+- include: gitlab.yml tags=gitlab
+- include: gitlab-shell.yml tags=gitlab
+- include: apache.yml tags=gitlab
+
+## TODO
+# AllowUsers git ... in /etc/ssh/sshd_config
+# check what happens with the assets
