@@ -18,9 +18,8 @@
     - libxslt1-dev
     - libcurl4-openssl-dev
     - libicu-dev
-    - mysql-server
-    - mysql-client
-    - libmysqlclient-dev
+    - postgresql-9.1
+    - postgresql-client-9.1
     - ruby1.9.1
     - bundler
     - python2.7

@@ -82,5 +82,4 @@ selfoss_username: "{{ main_user_name }}"
 selfoss_password_hash: "TODO"
 
 # gitlab
-gitlab_db_passwd: "TODO"
-gitlab_hostname: "TODO"
+gitlab_db_passwd: TODO

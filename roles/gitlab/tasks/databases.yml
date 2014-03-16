@@ -3,13 +3,16 @@
 #
 #
 - name: ensure mysql is running
-  service: name=mysql state=started enabled=yes
+  service: name=postgresql state=started enabled=yes
 
 - name: ensure redis is running
   service: name=redis-server state=started enabled=yes
 
 - name: ensure database for gitlab exists
-  mysql_db: state=present name={{ gitlab_db_name }} collation=utf8_unicode_ci encoding=utf8
+  postgresql_db: state=present name={{ gitlab_db_name }} login_user={{ db_admin_username }} login_password={{ db_admin_password }}
 
-- name: ensure database user for gitlab is present and has privleges
-  mysql_user: state=present host=localhost name={{ gitlab_db_user }} password={{ gitlab_db_passwd }} priv={{ gitlab_db_name }}.*:ALL
+- name: ensure database user for gitlab is present
+  postgresql_user: state=present login_host=localhost login_user={{ db_admin_username }} login_password={{ db_admin_password }} name={{ gitlab_db_user }} password={{ gitlab_db_passwd }}
+
+- name: ensure database user for gitlab has privileges
+  postgresql_privs: login={{ db_admin_username }} password={{ db_admin_password }} roles={{ gitlab_db_user }} privs="*:ALL"
